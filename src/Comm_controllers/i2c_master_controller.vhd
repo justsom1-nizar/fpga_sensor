@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------------------
 -- Company: 
--- Engineer: 
+-- Engineer: Nizar K.
 -- 
 -- Create Date: 10/01/2025 07:44:47 PM
 -- Design Name: 
@@ -35,24 +35,21 @@ entity i2c_master_controller is
     Port ( SCL : in STD_LOGIC;
            SDA : inout STD_LOGIC;
            Start_sending : in STD_LOGIC;
-           Addr_Byte : in STD_LOGIC_VECTOR (I2C_Adress_size-1 downto 0);
            Data_to_write : in STD_LOGIC_VECTOR (I2C_Data_size-1 downto 0);
-           R_W_bit : in STD_LOGIC;
-           Data_ready_bit : out STD_LOGIC;
+           lastByte : in STD_LOGIC;
+
+           currentState : out state_type;
            Data_to_read : out STD_LOGIC_VECTOR (I2C_Data_size-1 downto 0));
 end i2c_master_controller;
 
 architecture Behavioral of i2c_master_controller is
 
-    type state_type is (IDLE, START, ADDR, RW_BIT_STATE, WAIT_FOR_ACK,WRITE, READ, STOP);
     signal state : state_type := IDLE;
     signal bit_cnt : integer range 0 to I2C_Adress_size := 0;
     signal data_reg_Signal : STD_LOGIC_VECTOR(I2C_Data_size-1 downto 0);
-    signal r_w_bit_signal : STD_LOGIC;
-    signal Addr_Byte_signal : STD_LOGIC_VECTOR(I2C_Adress_size-1 downto 0);
-    signal timeout_cnt : integer range 0 to timeout_limit := 0;
-begin
 
+begin
+currentState <= state;
 process(SCL)
 begin
     if rising_edge(SCL) then
@@ -60,79 +57,59 @@ begin
             when IDLE =>
                 if Start_sending = '1' then
                     state <= START;
-                    Addr_Byte_signal <= Addr_Byte;
-                    Data_ready_bit <= '0';
+                    -- Addr_Byte_signal <= Addr_Byte;
                 end if;
 
             when START =>
-                state <= ADDR;
-                bit_cnt <= 6;
-                SDA <= '0'; -- Release SDA
-                Data_ready_bit <= '0';
+                state <= WRITING_BYTE;
+                bit_cnt <= I2C_Data_size;
+                SDA <= '0'; 
 
-            when ADDR =>
-                -- Send address bits
+            when WRITING_BYTE =>
+                
                 if bit_cnt >= 0 then
-                    SDA <= Addr_Byte_signal(bit_cnt);
+                    SDA <= Data_to_write(bit_cnt);
                     if bit_cnt = 0 then
-                        state <= RW_BIT_STATE;
+                        state <= SLAVE_ACK;
                     else
                         bit_cnt <= bit_cnt - 1;
                     end if;
                 end if;
 
-            when RW_BIT_STATE =>
-                -- Store the R/W bit while waiting for ack
-                r_w_bit_signal <= R_W_bit;
-                state <= WAIT_FOR_ACK;
-                SDA <= 'Z'; -- Release SDA for ACK
-            when WAIT_FOR_ACK =>
+            when SLAVE_ACK =>
                 if SDA = '0' then
-                    -- ACK received
                     bit_cnt <= I2C_Data_size - 1;
-                    if r_w_bit_signal = '0' then
-                        state <= WRITE;
-                        data_reg_Signal <= Data_to_write;
+                    if lastByte = '0' then
+                        state <= WRITING_BYTE;
                     else
-                        state <= READ;
+                        state <= READING_BYTE;
 
                     end if;
                 else
-                    -- NACK received
-                    if timeout_cnt < timeout_limit then
-                        timeout_cnt <= timeout_cnt + 1;
-                        state <= WAIT_FOR_ACK;
-                    else
-                        state <= STOP; -- Timeout, go to STOP
-                    end if;
-                end if;
-            when WRITE =>
-                -- Write data bits
-                if bit_cnt >= 0 then
-                    SDA <= data_reg_Signal(bit_cnt);
-                    if bit_cnt = 0 then
-                        state <= STOP;
-                    else
-                        bit_cnt <= bit_cnt - 1;
-                    end if;
-                end if;
-
-            when READ =>
-                -- Read data bits
+                    state <= STOP;
+                end if; 
+            when MASTER_ACK =>
+                SDA <= '0';
+                if lastByte = '0' then
+                    bit_cnt <= I2C_Data_size - 1;
+                    state <= READING_BYTE;
+                else 
+                    state <= READING_BYTE;
+                end if;    
+            when READING_BYTE =>
                 if bit_cnt >= 0 then
                     data_reg_Signal(bit_cnt) <= SDA;
                     if bit_cnt = 0 then
                         Data_to_read <= data_reg_Signal;
-                        Data_ready_bit <= '1';
-                        state <= STOP;
+                        state <= MASTER_ACK;
                     else
                         bit_cnt <= bit_cnt - 1;
+                        state <= READING_BYTE;
                     end if;
                 end if;
 
             when STOP =>
                 SDA <= 'Z'; -- Release SDA
-                Data_ready_bit <= '0';
                 state <= IDLE;
             when others =>
                 state <= IDLE;

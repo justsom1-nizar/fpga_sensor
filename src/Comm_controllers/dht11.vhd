@@ -5,7 +5,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
-entity dh11 is
+entity dht11 is
     Port (
         clk         : in  std_logic;         -- System clock (lets imagine we get 100kHz clock)
         rst         : in  std_logic;         -- Asynchronous reset
@@ -15,9 +15,9 @@ entity dh11 is
         temperature : out std_logic_vector(7 downto 0); -- 8-bit temperature output
         humidity    : out std_logic_vector(7 downto 0)  -- 8-bit humidity output
     );
-end dh11;
+end dht11;
 
-architecture Behavioral of dh11 is
+architecture Behavioral of dht11 is
 
     type state_type is (IDLE, START_CONDITION, DH11_ACK_RESPONSE, DH11_ACK_GET_READY,DATA_TRANSFER);
     signal state : state_type := IDLE;
