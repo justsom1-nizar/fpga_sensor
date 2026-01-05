@@ -22,24 +22,19 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use work.work_package.all;
--- Uncomment the following library declaration if using
--- arithmetic functions with Signed or Unsigned values
+
 --use IEEE.NUMERIC_STD.ALL;
 
--- Uncomment the following library declaration if instantiating
--- any Xilinx leaf cells in this code.
---library UNISIM;
---use UNISIM.VComponents.all;
 
 entity i2c_master_controller is
     Port ( SCL : in STD_LOGIC;
            SDA : inout STD_LOGIC;
            Start_sending : in STD_LOGIC;
-           Data_to_write : in STD_LOGIC_VECTOR (I2C_Data_size-1 downto 0);
+           Byte_to_write : in STD_LOGIC_VECTOR (I2C_Data_size-1 downto 0);
            lastByte : in STD_LOGIC;
 
            currentState : out state_type;
-           Data_to_read : out STD_LOGIC_VECTOR (I2C_Data_size-1 downto 0));
+           Byte_to_read : out STD_LOGIC_VECTOR (I2C_Data_size-1 downto 0));
 end i2c_master_controller;
 
 architecture Behavioral of i2c_master_controller is
@@ -68,7 +63,7 @@ begin
             when WRITING_BYTE =>
                 
                 if bit_cnt >= 0 then
-                    SDA <= Data_to_write(bit_cnt);
+                    SDA <= Byte_to_write(bit_cnt);
                     if bit_cnt = 0 then
                         state <= SLAVE_ACK;
                     else
@@ -100,7 +95,7 @@ begin
                 if bit_cnt >= 0 then
                     data_reg_Signal(bit_cnt) <= SDA;
                     if bit_cnt = 0 then
-                        Data_to_read <= data_reg_Signal;
+                        Byte_to_read <= data_reg_Signal;
                         state <= MASTER_ACK;
                     else
                         bit_cnt <= bit_cnt - 1;
